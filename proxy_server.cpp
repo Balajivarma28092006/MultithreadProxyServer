@@ -1,10 +1,4 @@
-#include <string>
-#include <thread>
-#include <vector>
-#include <sstream>
-#include <fstream>
-
-#include "socket.h"
+#include "server_socket.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 4096
@@ -13,15 +7,17 @@ class ProxyServer
 {
 private:
     Socket socket_;
-    int client_count;
 
 public:
-    ProxyServer() : socket_(), client_count(0) {}
+    ProxyServer() : socket_() {}
 
     bool SockInitialize() {
         return socket_.initialize(PORT);
     }
 
+    void start() {
+        socket_.start();
+    }
 };
 
 int main()
@@ -33,5 +29,6 @@ int main()
     {
         return -1;
     }
+    server.start();
     return 0;
 }

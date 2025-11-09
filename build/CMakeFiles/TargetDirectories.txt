@@ -1,0 +1,4 @@
+C:/Users/balaj/vscode/c++/OS/proxy_windows/build/CMakeFiles/proxy.dir
+C:/Users/balaj/vscode/c++/OS/proxy_windows/build/CMakeFiles/client.dir
+C:/Users/balaj/vscode/c++/OS/proxy_windows/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/balaj/vscode/c++/OS/proxy_windows/build/CMakeFiles/ZERO_CHECK.dir

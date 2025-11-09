@@ -3,9 +3,17 @@ project(proxy)
 
 set(CMAKE_CXX_STANDARD 17)
 
+#proxy_server
 add_executable(proxy
     proxy_server.cpp
-    socket.cpp
+    server_socket.cpp
 )
 
 target_link_libraries(proxy ws2_32)
+
+#client
+add_executable(client
+    proxy_client.cpp
+    client_socket.cpp
+)
+target_link_libraries(client ws2_32)
