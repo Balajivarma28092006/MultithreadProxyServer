@@ -24,7 +24,7 @@ int main()
 {
     ProxyServer server;
 
-    // check this bitch is working or not
+    // check if it working or not
     if (!server.SockInitialize())
     {
         return -1;
