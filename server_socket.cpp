@@ -80,7 +80,7 @@ bool Socket::initialize(int PORT) {
     return false;
   }
 
-  // listen yoo bitch
+  // listen yoo 
   if (listen(server_fd, SOMAXCONN) == SOCKET_ERROR) {
     std::cerr << "Binding failed" << WSAGetLastError() << std::endl;
     closesocket(server_fd);
@@ -88,7 +88,6 @@ bool Socket::initialize(int PORT) {
     return false; // if it wont listen
   }
 
-  // if by gods grace everything working good then should show
   std::cout << "Proxy server listening to the port " << PORT << std::endl;
   return true;
 }
