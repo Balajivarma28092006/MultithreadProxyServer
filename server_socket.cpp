@@ -4,7 +4,9 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <algorithm>
 #include <winsock2.h>
+#include <atomic>
 
 #define BUFFER_SIZE 4096
 #pragma comment(lib, "ws2_32.lib")
@@ -117,12 +119,12 @@ std::string Socket::fetchURlContent(const std::string &url) {
 }
 
 void Socket::handleClient(SOCKET client_socket) {
-  client_count++;
-  int current_client_id = client_count;
+  std::atomic<int> client_count = 0;
+  int current_client_id = ++client_count;
   std::cout << "Client " << current_client_id
             << " connected. Total clients: " << current_client_id << std::endl;
 
-  char buffer[BUFFER_SIZE] = {0};
+  char buffer[BUFFER_SIZE];
   while (true) {
     // clear buffer
     memset(buffer, 0, BUFFER_SIZE);
@@ -131,6 +133,11 @@ void Socket::handleClient(SOCKET client_socket) {
     int bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
     if (bytes_read > 0) {
       std::string url = std::string(buffer, bytes_read);
+
+      //trim crlf (carriage return + line feed) like /r/n
+      url.erase(std::remove(url.begin(), url.end(), '\r'), url.end());
+      url.erase(std::remove(url.begin(), url.end(), '\n'), url.end());
+
 
       // Check for quit command
       if (url == "quit" || url == "exit") {
@@ -158,8 +165,11 @@ void Socket::handleClient(SOCKET client_socket) {
       break;
     }
   }
+
+  shutdown(client_socket, SD_BOTH);
   closesocket(client_socket);
-   std::cout << "Client " << current_client_id << " connection closed" << std::endl;
+  std::cout << "Client " << current_client_id << " connection closed"
+            << std::endl;
 }
 
 void Socket::start() {
@@ -179,14 +189,8 @@ void Socket::start() {
     }
 
     // Create a new thread for each client
-    threads.emplace_back(
-        [this, client_socket]() { this->handleClient(client_socket); });
-  }
-
-  //wait for all thread to finish
-  for (auto& thread : threads) {
-      if(thread.joinable()){
-          thread.join();
-      }
+    std::thread([this, client_socket]() {
+      this -> handleClient(client_socket);
+    }).detach();
   }
 }

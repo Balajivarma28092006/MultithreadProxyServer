@@ -1,6 +1,7 @@
 #include "client_socket.h"
 #include <fstream>
 #include <iostream>
+#include <minwinbase.h>
 #include <string>
 #include <winsock2.h>
 
@@ -200,12 +201,12 @@ bool CLI_Socket::fetchURL(const std::string &url) {
 }
 
 void CLI_Socket::run() {
-    while(true) {
-        std::string url = getURLFromUser();
+  while (true) {
+    std::string url = getURLFromUser();
 
-        if(!fetchURL(url)){
-            break;
-        }
+    if (!fetchURL(url)) {
+      break;
     }
-     std::cout << "Disconnecting from server..." << std::endl;
+  }
+  std::cout << "Disconnecting from server..." << std::endl;
 }
