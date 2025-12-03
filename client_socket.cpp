@@ -129,7 +129,7 @@ bool CLI_Socket::fetchURL(const std::string &url) {
   }
 
   // send the url ro the server
-  int sent_bytes = send(sock, url.c_str(), url.length(), 0);
+  int sent_bytes = send(sock, url.c_str(), static_cast<int>(url.length()), 0);
   if (sent_bytes == SOCKET_ERROR) {
     std::cerr << "Failed to send URL to server: " << WSAGetLastError()
               << std::endl;
