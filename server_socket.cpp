@@ -4,10 +4,14 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <algorithm>
 #include <winsock2.h>
+#include <atomic>
+#include <winhttp.h>
 
 #define BUFFER_SIZE 4096
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winhttp.lib")
 
 Socket::Socket() {
   server_fd = INVALID_SOCKET;
@@ -80,7 +84,7 @@ bool Socket::initialize(int PORT) {
     return false;
   }
 
-  // listen yoo 
+  // listen yoo bitch
   if (listen(server_fd, SOMAXCONN) == SOCKET_ERROR) {
     std::cerr << "Binding failed" << WSAGetLastError() << std::endl;
     closesocket(server_fd);
@@ -88,40 +92,110 @@ bool Socket::initialize(int PORT) {
     return false; // if it wont listen
   }
 
+  // if by gods grace everything working good then should show
   std::cout << "Proxy server listening to the port " << PORT << std::endl;
   return true;
 }
 
 std::string Socket::fetchURlContent(const std::string &url) {
-  std::string command = "curl -s -L --connect-timeout 10 \"" + url + "\"";
-  std::string content;
-  char buffer[BUFFER_SIZE];
+  // std::string command = "curl -s -L --connect-timeout 10 \"" + url + "\"";
+  // std::string content;
+  // char buffer[BUFFER_SIZE];
 
-  FILE *pipe = _popen(command.c_str(), "r");
-  if (!pipe) {
-    return "Error: Failed to fetch URL content";
+  // FILE *pipe = _popen(command.c_str(), "r");
+  // if (!pipe) {
+  //   return "Error: Failed to fetch URL content";
+  // }
+
+  // while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+  //   content += buffer;
+  // }
+
+  // int status = _pclose(pipe);
+
+  // if (content.empty() || status != 0) {
+  //   return "Error: Failed to fetch content from URL or URL not accessible";
+  // }
+
+  // return content;
+
+  std::wstring wurl(url.begin(), url.end());
+
+  //parse the url
+  URL_COMPONENTS components = {0};
+  components.dwStructSize = sizeof(URL_COMPONENTS);
+  components.dwHostNameLength = (DWORD) - 1;
+  components.dwUrlPathLength = (DWORD) - 1;
+
+  if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &components)){
+    return "Error: Invalid URl";
   }
 
-  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-    content += buffer;
-  }
+   std::wstring host(components.lpszHostName, components.dwHostNameLength);
+   std::wstring path(components.lpszUrlPath, components.dwUrlPathLength);
 
-  int status = _pclose(pipe);
+    // Connect
+    HINTERNET hSession = WinHttpOpen(L"ProxyServer/1.0",
+                                     WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                     NULL, NULL, 0);
+    if (!hSession) return "Error: WinHttpOpen failed";
 
-  if (content.empty() || status != 0) {
-    return "Error: Failed to fetch content from URL or URL not accessible";
-  }
+    HINTERNET hConnect = WinHttpConnect(
+        hSession, host.c_str(), components.nPort, 0
+    );
+     if (!hConnect) return "Error: WinHttpConnect failed";
 
-  return content;
+    HINTERNET hRequest = WinHttpOpenRequest(
+        hConnect, L"GET", path.c_str(),
+        NULL, WINHTTP_NO_REFERER,
+        WINHTTP_DEFAULT_ACCEPT_TYPES,
+        (components.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0
+    );
+
+    if (!hRequest) return "Error: WinHttpOpenRequest failed";
+
+    BOOL sent = WinHttpSendRequest(
+        hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+        WINHTTP_NO_REQUEST_DATA, 0, 0, 0
+    );
+
+    if (!sent) return "Error: WinHttpSendRequest failed";
+
+    BOOL received = WinHttpReceiveResponse(hRequest, NULL);
+    if (!received) return "Error: WinHttpReceiveResponse failed";
+
+    // Read data
+    std::string content;
+    DWORD size = 0;
+
+    do {
+        WinHttpQueryDataAvailable(hRequest, &size);
+        if (size == 0) break;
+
+        std::string buffer(size, 0);
+        DWORD downloaded = 0;
+
+        WinHttpReadData(hRequest, &buffer[0], size, &downloaded);
+        buffer.resize(downloaded);
+
+        content += buffer;
+    } while (size > 0);
+
+    // Cleanup
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+
+    return content;
+  
 }
 
 void Socket::handleClient(SOCKET client_socket) {
-  client_count++;
-  int current_client_id = client_count;
+  int current_client_id = ++client_count;
   std::cout << "Client " << current_client_id
             << " connected. Total clients: " << current_client_id << std::endl;
 
-  char buffer[BUFFER_SIZE] = {0};
+  char buffer[BUFFER_SIZE];
   while (true) {
     // clear buffer
     memset(buffer, 0, BUFFER_SIZE);
@@ -130,6 +204,11 @@ void Socket::handleClient(SOCKET client_socket) {
     int bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
     if (bytes_read > 0) {
       std::string url = std::string(buffer, bytes_read);
+
+      //trim crlf (carriage return + line feed) like /r/n
+      url.erase(std::remove(url.begin(), url.end(), '\r'), url.end());
+      url.erase(std::remove(url.begin(), url.end(), '\n'), url.end());
+
 
       // Check for quit command
       if (url == "quit" || url == "exit") {
@@ -145,7 +224,7 @@ void Socket::handleClient(SOCKET client_socket) {
       std::string content = fetchURlContent(url);
 
       // send the content back to the client
-      send(client_socket, content.c_str(), content.length(), 0);
+      send(client_socket, content.c_str(), static_cast<int>(content.length()), 0);
       std::cout << "Sent " << content.length() << " bytes to client "
                 << current_client_id << std::endl;
     } else if (bytes_read == 0) {
@@ -157,8 +236,11 @@ void Socket::handleClient(SOCKET client_socket) {
       break;
     }
   }
+
+  shutdown(client_socket, SD_BOTH);
   closesocket(client_socket);
-   std::cout << "Client " << current_client_id << " connection closed" << std::endl;
+  std::cout << "Client " << current_client_id << " connection closed"
+            << std::endl;
 }
 
 void Socket::start() {
@@ -178,14 +260,8 @@ void Socket::start() {
     }
 
     // Create a new thread for each client
-    threads.emplace_back(
-        [this, client_socket]() { this->handleClient(client_socket); });
-  }
-
-  //wait for all thread to finish
-  for (auto& thread : threads) {
-      if(thread.joinable()){
-          thread.join();
-      }
+    std::thread([this, client_socket]() {
+      this -> handleClient(client_socket);
+    }).detach();
   }
 }

@@ -1,8 +1,13 @@
 #include "client_socket.h"
 #include <fstream>
 #include <iostream>
+#include <filesystem>
+#include <minwinbase.h>
 #include <string>
 #include <winsock2.h>
+// #include <curl/curl.h>
+
+namespace fs = std::filesystem;
 
 #define BUFFER_SIZE 4096
 #define PORT 8080
@@ -111,14 +116,34 @@ std::string CLI_Socket::generateFileName(const std::string &url) {
 }
 
 void CLI_Socket::saveToFile(const std::string &filename,
-                            const std::string &content) {
-  std::ofstream file(filename);
-  if (file.is_open()) {
-    file << content;
-    file.close();
-    std::cout << "Content saved to: " << filename << std::endl;
-  } else {
-    std::cerr << "Failed to save file: " << filename << std::endl;
+                            const std::string &content,
+                          const std::string &directory) {
+  // std::ofstream file(filename);
+  // if (file.is_open()) {
+  //   file << content;
+  //   file.close();
+  //   std::cout << "Content saved to: " << filename << std::endl;
+  // } else {
+  //   std::cerr << "Failed to save file: " << filename << std::endl;
+  // }
+
+  try{
+    if(!fs::exists(directory)){
+      fs::create_directories(directory);
+    }
+    //filepath as string 
+    fs::path filepath = fs::path(directory) / filename;
+
+    std::ofstream file(filepath, std::ios::binary);
+    if(file.is_open()){
+      file << content;
+      file.close();
+      std::cout << "Content saved to: " << filepath.string() << std::endl;
+    } else {
+      std::cerr << "Failed to save files: " << filepath.string() << std::endl;
+    }
+  } catch(const std::exception &e){
+    std::cerr << "Exception while saving files: " << e.what() << std::endl;
   }
 }
 
@@ -128,7 +153,7 @@ bool CLI_Socket::fetchURL(const std::string &url) {
   }
 
   // send the url ro the server
-  int sent_bytes = send(sock, url.c_str(), url.length(), 0);
+  int sent_bytes = send(sock, url.c_str(), static_cast<int>(url.length()), 0);
   if (sent_bytes == SOCKET_ERROR) {
     std::cerr << "Failed to send URL to server: " << WSAGetLastError()
               << std::endl;
@@ -162,9 +187,8 @@ bool CLI_Socket::fetchURL(const std::string &url) {
     mode = 0;
     ioctlsocket(sock, FIONBIO, &mode); // Back to blocking mode
 
-    while ((bytes_received = recv(sock, buffer, BUFFER_SIZE - 1, 0)) > 0) {
+    while ((bytes_received = recv(sock, buffer, BUFFER_SIZE-1, 0)) > 0) {
       content.append(buffer, bytes_received);
-      memset(buffer, 0, BUFFER_SIZE);
 
       if (bytes_received < BUFFER_SIZE - 1) {
         break;
@@ -189,7 +213,7 @@ bool CLI_Socket::fetchURL(const std::string &url) {
 
   // Generate filename and save content
   std::string filename = generateFileName(url);
-  saveToFile(filename, content);
+  saveToFile(filename, content, "C:/Users/balaj/vscode/c++/os/proxy_windows/downloads");
 
   std::cout << "Received " << content.length() << " bytes from server"
             << std::endl;
@@ -200,12 +224,12 @@ bool CLI_Socket::fetchURL(const std::string &url) {
 }
 
 void CLI_Socket::run() {
-    while(true) {
-        std::string url = getURLFromUser();
+  while (true) {
+    std::string url = getURLFromUser();
 
-        if(!fetchURL(url)){
-            break;
-        }
+    if (!fetchURL(url)) {
+      break;
     }
-     std::cout << "Disconnecting from server..." << std::endl;
+  }
+  std::cout << "Disconnecting from server..." << std::endl;
 }

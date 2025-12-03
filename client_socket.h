@@ -17,7 +17,7 @@ class CLI_Socket {
     bool connectToServer(const std::string& serve_ip = "127.0.0.1");
     std::string getURLFromUser();
     std::string generateFileName(const std::string& url);
-    void saveToFile(const std::string& filename, const std::string& content);
+    void saveToFile(const std::string& filename, const std::string& content, const std::string& directory = "downloads");
     bool fetchURL(const std::string& url);
     void run();
 };
