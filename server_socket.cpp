@@ -192,8 +192,9 @@ std::string Socket::fetchURlContent(const std::string &url) {
 
 void Socket::handleClient(SOCKET client_socket) {
   int current_client_id = ++client_count;
+  std::thread::id this_id = std::this_thread::get_id();
   std::cout << "Client " << current_client_id
-            << " connected. Total clients: " << current_client_id << std::endl;
+            << " connected. Total clients: " << current_client_id <<" ID: " << this_id<< std::endl;
 
   char buffer[BUFFER_SIZE];
   while (true) {
